@@ -1,12 +1,12 @@
 import jwt from "jsonwebtoken"
-import Author from "../services/authors/schema.js"
+import User from "../services/users/schema.js"
 
-export const authenticate = async author => {
-  const newAccessToken = await generateJWT({ _id: author._id })
-  const newRefreshToken = await generateRefreshJWT({ _id: author._id })
+export const authenticate = async user => {
+  const newAccessToken = await generateJWT({ _id: user._id })
+  const newRefreshToken = await generateRefreshJWT({ _id: user._id })
 
-  author.refreshToken = newRefreshToken
-  await author.save()
+  user.refreshToken = newRefreshToken
+  await user.save()
 
   return { token: newAccessToken, refreshToken: newRefreshToken }
 }
@@ -46,23 +46,23 @@ const verifyRefreshToken = token =>
 export const refreshToken = async oldRefreshToken => {
   const decoded = await verifyRefreshToken(oldRefreshToken)
 
-  const author = await Author.findOne({ _id: decoded._id })
+  const user = await User.findOne({ _id: decoded._id })
 
-  if (!author) {
+  if (!user) {
     throw new Error("Access is forbidden")
   }
 
-  const currentRefreshToken = author.refreshToken
+  const currentRefreshToken = user.refreshToken
 
   if (currentRefreshToken !== oldRefreshToken) {
     throw new Error("Refresh token is wrong")
   }
 
-  const newAccessToken = await generateJWT({ _id: author._id })
-  const newRefreshToken = await generateRefreshJWT({ _id: author._id })
+  const newAccessToken = await generateJWT({ _id: user._id })
+  const newRefreshToken = await generateRefreshJWT({ _id: user._id })
 
-  author.refreshToken = newRefreshToken
-  await author.save()
+  user.refreshToken = newRefreshToken
+  await user.save()
 
   return { token: newAccessToken, refreshToken: newRefreshToken }
 }

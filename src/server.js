@@ -1,38 +1,41 @@
 import express from "express"
 import mongoose from "mongoose"
 import listEndpoints from "express-list-endpoints"
-import articlesRouter from "./services/articles/index.js" 
-import authorRouter from "./services/authors/index.js";
-import {
-    notFoundErrorHandler,
-    badRequestErrorHandler,
-    catchAllErrorHandler,
-  } from "./errorHandlers.js";
+
+import articlesRouter from "./services/users/index.js"
+import usersRoutes from "./services/users/index.js"
+
+import { unauthorizedErrorHandler, forbiddenErrorHandler, catchAllErrorHandler } from "./errorHandlers.js"
 
 const server = express()
-const PORT = process.env.PORT 
+
+const port = process.env.PORT || 3001
+
+// *************** MIDDLEWARES ****************
 
 server.use(express.json())
 
+// *************** ROUTES ***********************
 
-server.use("/articles", articlesRouter);
-server.use("/authors", authorRouter);
+server.use("/users", usersRoutes)
+server.use("/articles", articlesRouter)
 
-server.use(badRequestErrorHandler);
-server.use(notFoundErrorHandler);
-server.use(catchAllErrorHandler);
-console.table(listEndpoints(server))
+// *************** ERROR HANDLERS *****************
+
+server.use(unauthorizedErrorHandler)
+server.use(forbiddenErrorHandler)
+server.use(catchAllErrorHandler)
 
 mongoose.connect(process.env.MONGO_CONNECTION, { useNewUrlParser: true, useUnifiedTopology: true })
-console.log(process.env.MONGO_CONNECTION)
+
 mongoose.connection.on("connected", () => {
   console.log("Successfully connected to Mongo!")
-  server.listen(PORT, () => {
-    console.log("Server is running on port: ", PORT)
+  server.listen(port, () => {
+    console.table(listEndpoints(server))
+    console.log("Server is running on port: ", port)
   })
 })
 
 mongoose.connection.on("error", err => {
   console.log(err)
 })
-
