@@ -1,7 +1,7 @@
 import express from "express";
-import mongoose from "mongoose"
-import q2m from "query-to-mongo";
-import { basicAuthMiddleware, adminOnly } from "../../auth/index.js"
+import { adminOnlyMiddleware, jwtAuthMiddleware } from "../../auth/index.js"
+import { authenticate, refreshToken } from "../../auth/tools.js"
+
 import AuthorModel from "./schema.js";
 
 const authorRouter = express.Router();
@@ -12,37 +12,25 @@ authorRouter.post("/register", async (req, res, next) => {
       console.log(newAuthor)
      const {_id} = await newAuthor.save()
   
-      res.send(_id).status(2001)
+      res.status(201).send(_id)
     } catch (error) {
       console.log(error, "this is error")
       next(error)
     }
   })
 
-authorRouter.get("/", basicAuthMiddleware, adminOnly, async (req, res, next) => {
+  authorRouter.get("/", jwtAuthMiddleware, adminOnlyMiddleware, async (req, res, next) => {
+    try {
+      const author = await AuthorModel.find()
+      res.send(author)
+    } catch (error) {
+      next(error)
+    }
+  })
+
+authorRouter.get("/me",jwtAuthMiddleware, async (req, res, next) => {
   try {
-    //const query = q2m(req.query);
-    //const total = await AuthorModel.countDocuments(query.criteria);
 
-    //const authors = await AuthorModel.find(query.criteria, query.options.fields)
-      //.skip(query.options.skip)
-      //.limit(query.options.limit)
-      //.sort(query.options.sort);
-
-    //res.send({ links: query.links("/author", total), authors });
-    const author = await AuthorModel.find()
-    res.send(author);
-  } catch (error) {
-    console.log(error);
-    next(error);
-  }
-});
-
-authorRouter.get("/me",basicAuthMiddleware, async (req, res, next) => {
-  try {
-    // const author = await AuthorModel.findById(req.params.id);
-    console.log(req.body, "this one here")
-    const author = await AuthorModel.find()
     res.send(req.author);
   } catch (error) {
     console.log(error);
@@ -50,45 +38,73 @@ authorRouter.get("/me",basicAuthMiddleware, async (req, res, next) => {
   }
 });
 
-authorRouter.put("/me",basicAuthMiddleware, async (req, res, next) => {
+authorRouter.put("/me", jwtAuthMiddleware, async (req, res, next) => {
   try {
+    console.log(req.body)
 
-    //const modifiedAuthor = await AuthorModel.findByIdAndUpdate(
-      //req.params.id,
-      //req.body,
-      //{
-        //runValidators: true,
-        //new: true,
-     // }
-     const update = Object.keys(req.body)
-     update.forEach(u=>(req.author[u]= req.author[u] ))
-     await req.author.save()
-     req.status(204).send()
-    // );
-    // if (modifiedAuthor) {
-     // res.send(modifiedAuthor);
-    //} else {
-    //  next();
-   // }
+    // req.user.name = req.body.name
+
+    const updates = Object.keys(req.body)
+
+    updates.forEach(u => (req.author[u] = req.body[u]))
+
+    await req.author.save()
+
+    res.status(204).send()
   } catch (error) {
-    console.log(error);
-    next(error);
+    next(error)
   }
-});
+})
 
-authorRouter.delete("/", basicAuthMiddleware, async (req, res, next) => {
+authorRouter.delete("/me", jwtAuthMiddleware, async (req, res, next) => {
   try {
     //const author = await AuthorModel.findByIdAndDelete(req.params.id);
     await req.author.deleteOne()
-    if (req.author) {
-      res.send("Deleted");
-    } else {
-      next();
-    }
+    res.status(204).send()
   } catch (error) {
     console.log(error);
     next(error);
   }
 });
+
+authorRouter.post("/login", async (req, res, next) => {
+  try {
+    const { email, password } = req.body
+    const author = await AuthorModel.checkCredentials(email, password)
+    const tokens = await authenticate(author)
+    res.send(tokens)
+  } catch (error) {
+    next(error)
+  }
+})
+
+authorRouter.post("/refreshToken", async (req, res, next) => {
+  const oldRefreshToken = req.body.refreshToken
+  if (!oldRefreshToken) {
+    const err = new Error("Refresh token missing")
+    err.httpStatusCode = 400
+    next(err)
+  } else {
+    try {
+      const newTokens = await refreshToken(oldRefreshToken)
+      res.send(newTokens)
+    } catch (error) {
+      console.log(error)
+      const err = new Error(error)
+      err.httpStatusCode = 401
+      next(err)
+    }
+  }
+})
+
+authorRouter.post("/logout", jwtAuthMiddleware, async (req, res, next) => {
+  try {
+    req.author.refreshToken = null
+    await req.author.save()
+    res.send()
+  } catch (err) {
+    next(err)
+  }
+})
 
 export default authorRouter;

@@ -10,6 +10,7 @@ const AuthorSchema = new Schema({
   password: { type: String, required: true },
   role: { type: String, required: true, enum: ["Admin", "Writer"] },
   articles: [{ type: Schema.Types.ObjectId, required: true, ref: "article" }],
+  refreshToken: { type: String },
 });
 
 
@@ -35,11 +36,8 @@ AuthorSchema.pre("save", async function (next) {
 
   AuthorSchema.statics.checkCredentials = async function (email, plainPW) {
     const author = await this.findOne({ email })
-    console.log(author)
   
     if (author) {
-      console.log(plainPW)
-      console.log(author.password)
       const isMatch = await bcrypt.compare(plainPW, author.password)
       if (isMatch) return author
       else return null
